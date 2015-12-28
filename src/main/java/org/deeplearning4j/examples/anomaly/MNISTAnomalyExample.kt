@@ -1,7 +1,5 @@
 package org.deeplearning4j.examples.anomaly
 
-import org.apache.commons.lang3.tuple.ImmutableTriple
-import org.apache.commons.lang3.tuple.Triple
 import org.deeplearning4j.datasets.iterator.impl.MnistDataSetIterator
 import org.deeplearning4j.nn.api.OptimizationAlgorithm
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration
@@ -104,80 +102,55 @@ object MNISTAnomalyExample {
             println("Epoch $epoch complete")
         }
 
-        //Evaluate the model on test data
-        //Score each digit/example in test set separately
-        //Then add triple (score, digit, and INDArray data) to lists and sort by score
-        //This allows us to get best N and worst N digits for each type
-        val lists = (0..9).map {ArrayList<Triple<Double, Int, INDArray>>()}
+        class TestResult(val score: Double, val image: INDArray)
 
-        var count = 0
+        //Evaluate the model on test data
+        val lists = (0..9).map { ArrayList<TestResult>() }
+
         for (i in featuresTest.indices) {
             val testData = featuresTest[i]
             val labels = labelsTest[i]
             for (j in 0..testData.rows() - 1) {
-                val example = testData.getRow(j)
+                val image = testData.getRow(j)
                 val label = labels.getDouble(j).toInt()
-                val score = net.score(DataSet(example, example))
-                lists[label].add(ImmutableTriple(score, count++, example))
+                val score = net.score(DataSet(image, image))
+                lists[label].add(TestResult(score = score, image = image))
             }
         }
 
-        //Sort data by score, separately for each digit
-        val c = Comparator<org.apache.commons.lang3.tuple.Triple<kotlin.Double, kotlin.Int, org.nd4j.linalg.api.ndarray.INDArray>> { o1, o2 -> java.lang.Double.compare(o1.left, o2.left) }
+        val sortedLists = lists.map { it.sortedBy { it.score } }
+        val best = sortedLists.flatMap { it.map { it.image }.take(5) }
+        val worst = sortedLists.flatMap { it.map { it.image }.takeLast(5) }
 
-        for (list in lists) {
-            Collections.sort(list, c)
-        }
-
-        //Select the 5 best and 5 worst numbers (by reconstruction error) for each digit
-        val best = lists.flatMap { it.map { it.right }.take(5) }
-        val worst = lists.flatMap { it.map { it.right }.reversed().take(5) }
-
-        //Visualize the best and worst digits
-        val bestVisualizer = MNISTVisualizer(2.0, best, "Best (Low Rec. Error)")
-        bestVisualizer.visualize()
-
-        val worstVisualizer = MNISTVisualizer(2.0, worst, "Worst (High Rec. Error)")
-        worstVisualizer.visualize()
+        MNISTVisualizer(digits = best, title = "Best (Low Rec. Error)")()
+        MNISTVisualizer(digits = worst, title = "Worst (High Rec. Error)")()
     }
 
     private class MNISTVisualizer(
-            private val imageScale: Double,
             private val digits: List<INDArray>, //Digits (as row vectors), one per INDArray
-            private val title: String) {
+            private val title: String,
+            private val imageScale: Double = 2.0
+    ) {
+        operator fun invoke() {
+            JFrame().apply {
+                this.title = title
+                defaultCloseOperation = JFrame.EXIT_ON_CLOSE
+                add(JPanel().apply {
+                    layout = GridLayout(0, 5)
 
-        fun visualize() {
-            val frame = JFrame()
-            frame.title = title
-            frame.defaultCloseOperation = JFrame.EXIT_ON_CLOSE
-
-            val panel = JPanel()
-            panel.layout = GridLayout(0, 5)
-
-            val list = components
-            for (image in list) {
-                panel.add(image)
+                    components.forEach { add(it) }
+                })
+                isVisible = true
+                pack()
             }
-
-            frame.add(panel)
-            frame.isVisible = true
-            frame.pack()
         }
 
-        private val components: List<JLabel>
-            get() {
-                val images = ArrayList<JLabel>()
-                for (arr in digits) {
-                    val bi = BufferedImage(28, 28, BufferedImage.TYPE_BYTE_GRAY)
-                    for (i in 0..767) {
-                        bi.raster.setSample(i % 28, i / 28, 0, (255 * arr.getDouble(i)).toInt())
-                    }
-                    val orig = ImageIcon(bi)
-                    val imageScaled = orig.image.getScaledInstance((imageScale * 28).toInt(), (imageScale * 28).toInt(), Image.SCALE_REPLICATE)
-                    val scaled = ImageIcon(imageScaled)
-                    images.add(JLabel(scaled))
-                }
-                return images
+        private val components: List<JLabel> get() = digits.map {
+            val bi = BufferedImage(28, 28, BufferedImage.TYPE_BYTE_GRAY)
+            for (i in 0..767) {
+                bi.raster.setSample(i % 28, i / 28, 0, (255 * it.getDouble(i)).toInt())
             }
+            JLabel(ImageIcon(ImageIcon(bi).image.getScaledInstance((imageScale * 28).toInt(), (imageScale * 28).toInt(), Image.SCALE_REPLICATE)))
+        }
     }
 }
