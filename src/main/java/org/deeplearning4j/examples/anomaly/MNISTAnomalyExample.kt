@@ -84,7 +84,7 @@ object MNISTAnomalyExample {
         return scoredImages.groupBy { it.label }.entries.sortedBy { it.key }.map { it.value.sortedBy { it.score }.map { it.image } }
     }
 
-    fun MultiLayerNetwork.trainModel(trainingFeatureMatrices: ArrayList<INDArray>, epochCount: Int = 1) {
+    fun MultiLayerNetwork.trainModel(trainingFeatureMatrices: ArrayList<INDArray>, epochCount: Int = 30) {
         for (epochNumber in 1..epochCount) {
             trainingFeatureMatrices.forEach { fit(it, it) }
             println("Epoch $epochNumber complete")
