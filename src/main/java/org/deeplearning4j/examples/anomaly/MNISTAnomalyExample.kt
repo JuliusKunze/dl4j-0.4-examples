@@ -23,13 +23,12 @@ import javax.swing.JFrame
 import javax.swing.JLabel
 import javax.swing.JPanel
 
-/**Example: Anomaly Detection on MNIST using simple auto-encoder without pre-training
+/**Anomaly Detection on MNIST using simple auto-encoder without pre-training
  * The goal is to identify outliers digits, i.e., those digits that are unusual or
  * not like the typical digits.
  * This is accomplished in this example by using reconstruction error: stereotypical
  * examples should have low reconstruction error, whereas outliers should have high
- * reconstruction error
-
+ * reconstruction error.
  * @author Alex Black
  */
 object MNISTAnomalyExample {
@@ -42,11 +41,7 @@ object MNISTAnomalyExample {
         val net = MultiLayerNetwork(configuration()).apply { listeners = listOf(ScoreIterationListener(1)) }
         val batches = loadDataAsBatchesOf80Training20Test()
         net.trainModel(trainingFeatureMatrices = batches.map { it.train.featureMatrix }.toArrayList())
-        net.feedForward()
-        val imagesByDigit = net.imagesSortedTypicalToAnomalousGroupedByDigit(batches)
-        val reconstructedImagesByDigit = imagesByDigit.map { it.map { net.output(it) } }
-        visualize(imageRows = imagesByDigit)
-        visualize(imageRows = reconstructedImagesByDigit, titlePrefix = "Reconstructed outputs: ")
+        visualize(imageRows = net.imagesSortedTypicalToAnomalousGroupedByDigit(batches))
     }
 
     fun configuration() = NeuralNetConfiguration.Builder()
@@ -61,12 +56,12 @@ object MNISTAnomalyExample {
             .backprop(true)
             .build()
 
-    private fun visualize(imageRows: List<List<INDArray>>, titlePrefix: String = "", columnCount: Int = 5) {
-        Visualizer(images = imageRows.flatMap { it.take(columnCount) }, title = titlePrefix + "Best (= typical = good reconstruction)", columnCount = columnCount)()
-        Visualizer(images = imageRows.flatMap { it.takeLast(columnCount) }, title = titlePrefix + "Worst (= anomalous = high reconstruction error)", columnCount = columnCount)()
+    fun visualize(imageRows: List<List<INDArray>>, columnCount: Int = 5) {
+        Visualizer(images = imageRows.flatMap { it.take(columnCount) }, title = "Typical, best reconstruction", columnCount = columnCount)()
+        Visualizer(images = imageRows.flatMap { it.takeLast(columnCount) }, title = "Unusual, worst reconstruction", columnCount = columnCount)()
     }
 
-    private fun MultiLayerNetwork.imagesSortedTypicalToAnomalousGroupedByDigit(batches: List<SplitTestAndTrain>): List<List<INDArray>> {
+    fun MultiLayerNetwork.imagesSortedTypicalToAnomalousGroupedByDigit(batches: List<SplitTestAndTrain>): List<List<INDArray>> {
         class ScoredLabeledImage(val image: INDArray, val score: Double, val label: Int)
 
         val scoredImages = batches.map { it.test }.flatMap {
@@ -89,22 +84,22 @@ object MNISTAnomalyExample {
         return scoredImages.groupBy { it.label }.entries.sortedBy { it.key }.map { it.value.sortedBy { it.score }.map { it.image } }
     }
 
-    private fun MultiLayerNetwork.trainModel(trainingFeatureMatrices: ArrayList<INDArray>, epochCount: Int = 30) {
+    fun MultiLayerNetwork.trainModel(trainingFeatureMatrices: ArrayList<INDArray>, epochCount: Int = 1) {
         for (epochNumber in 1..epochCount) {
             trainingFeatureMatrices.forEach { fit(it, it) }
             println("Epoch $epochNumber complete")
         }
     }
 
-    private fun loadDataAsBatchesOf80Training20Test() =
+    fun loadDataAsBatchesOf80Training20Test() =
             MnistDataSetIterator(100, 50000, false).asSequence().
                     map { it.splitTestAndTrain(80, Random(12345)) }.toArrayList()
 
     fun NeuralNetConfiguration.ListBuilder.layers(vararg layerConfiguration: Int) =
-            layerConfiguration.withIndex().fold(this) { builder, layer ->
-                if (layer.index == layerConfiguration.lastIndex) this
-                else layer(layer.index,
-                        (if (layer.index == layerConfiguration.lastIndex - 1)
+            layerConfiguration.withIndex().fold(initial = this) { builder, layer ->
+                if (layer.index == layerConfiguration.lastIndex) builder
+                else builder.layer(layer.index,
+                        (if (layer.index + 1 == layerConfiguration.lastIndex)
                             OutputLayer.Builder().lossFunction(LossFunctions.LossFunction.MSE)
                         else
                             DenseLayer.Builder())
