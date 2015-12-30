@@ -40,8 +40,8 @@ object MNISTAnomalyExample {
     @JvmStatic fun main(args: Array<String>) {
         val net = MultiLayerNetwork(configuration()).apply { listeners = listOf(ScoreIterationListener(1)) }
         val batches = loadDataAsBatchesOf80Training20Test()
-        net.trainModel(trainingFeatureMatrices = batches.map { it.train.featureMatrix }.toArrayList())
-        visualize(imageRows = net.imagesSortedTypicalToAnomalousGroupedByDigit(batches))
+        net.trainModel(trainingFeatureMatrices = batches.map { it.train.featureMatrix })
+        visualize(imageRows = net.imagesSortedTypicalToUnusualGroupedByDigit(batches))
     }
 
     fun configuration() = NeuralNetConfiguration.Builder()
@@ -50,18 +50,17 @@ object MNISTAnomalyExample {
             .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
             .learningRate(0.05)
             .l2(0.001)
-            .list(4)
             .layers(pixelsPerImage, layer2Count, layer3Count, layer2Count, pixelsPerImage)
             .pretrain(false)
             .backprop(true)
             .build()
 
-    fun visualize(imageRows: List<List<INDArray>>, columnCount: Int = 5) {
+    fun visualize(imageRows: List<List<INDArray>>, columnCount: Int = 10) {
         Visualizer(images = imageRows.flatMap { it.take(columnCount) }, title = "Typical, best reconstruction", columnCount = columnCount)()
         Visualizer(images = imageRows.flatMap { it.takeLast(columnCount) }, title = "Unusual, worst reconstruction", columnCount = columnCount)()
     }
 
-    fun MultiLayerNetwork.imagesSortedTypicalToAnomalousGroupedByDigit(batches: List<SplitTestAndTrain>): List<List<INDArray>> {
+    fun MultiLayerNetwork.imagesSortedTypicalToUnusualGroupedByDigit(batches: List<SplitTestAndTrain>): List<List<INDArray>> {
         class ScoredLabeledImage(val image: INDArray, val score: Double, val label: Int)
 
         val scoredImages = batches.map { it.test }.flatMap {
@@ -84,7 +83,7 @@ object MNISTAnomalyExample {
         return scoredImages.groupBy { it.label }.entries.sortedBy { it.key }.map { it.value.sortedBy { it.score }.map { it.image } }
     }
 
-    fun MultiLayerNetwork.trainModel(trainingFeatureMatrices: ArrayList<INDArray>, epochCount: Int = 30) {
+    fun MultiLayerNetwork.trainModel(trainingFeatureMatrices: List<INDArray>, epochCount: Int = 30) {
         for (epochNumber in 1..epochCount) {
             trainingFeatureMatrices.forEach { fit(it, it) }
             println("Epoch $epochNumber complete")
@@ -95,8 +94,8 @@ object MNISTAnomalyExample {
             MnistDataSetIterator(100, 50000, false).asSequence().
                     map { it.splitTestAndTrain(80, Random(12345)) }.toArrayList()
 
-    fun NeuralNetConfiguration.ListBuilder.layers(vararg layerConfiguration: Int) =
-            layerConfiguration.withIndex().fold(initial = this) { builder, layer ->
+    fun NeuralNetConfiguration.Builder.layers(vararg layerConfiguration: Int) =
+            layerConfiguration.withIndex().fold(initial = this.list(layerConfiguration.count() - 1)) { builder, layer ->
                 if (layer.index == layerConfiguration.lastIndex) builder
                 else builder.layer(layer.index,
                         (if (layer.index + 1 == layerConfiguration.lastIndex)
