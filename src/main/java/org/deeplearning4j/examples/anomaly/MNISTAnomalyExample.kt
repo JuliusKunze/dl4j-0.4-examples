@@ -34,8 +34,8 @@ import javax.swing.JPanel
 object MNISTAnomalyExample {
     val imageWidth = 28
     val pixelsPerImage = imageWidth * imageWidth
-    val layer2Count = 250
-    val layer3Count = 50
+    val layer2NeuronCount = 250
+    val layer3NeuronCount = 10
 
     @JvmStatic fun main(args: Array<String>) {
         val net = MultiLayerNetwork(configuration()).apply { listeners = listOf(ScoreIterationListener(1)) }
@@ -50,7 +50,7 @@ object MNISTAnomalyExample {
             .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
             .learningRate(0.05)
             .l2(0.001)
-            .layers(pixelsPerImage, layer2Count, layer3Count, layer2Count, pixelsPerImage)
+            .layers(pixelsPerImage, layer2NeuronCount, layer3NeuronCount, layer2NeuronCount, pixelsPerImage)
             .pretrain(false)
             .backprop(true)
             .build()
