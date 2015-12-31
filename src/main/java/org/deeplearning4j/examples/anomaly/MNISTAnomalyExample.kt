@@ -56,8 +56,8 @@ object MNISTAnomalyExample {
             .build()
 
     fun visualize(imageRows: List<List<INDArray>>, columnCount: Int = 10) {
-        Visualizer(images = imageRows.flatMap { it.take(columnCount) }, title = "Typical, best reconstruction", columnCount = columnCount)()
-        Visualizer(images = imageRows.flatMap { it.takeLast(columnCount) }, title = "Unusual, worst reconstruction", columnCount = columnCount)()
+        Visualizer(images = imageRows.flatMap { it.take(columnCount) }, title = "Typical (best reconstruction)", columnCount = columnCount)()
+        Visualizer(images = imageRows.flatMap { it.takeLast(columnCount) }, title = "Unusual (worst reconstruction)", columnCount = columnCount)()
     }
 
     fun MultiLayerNetwork.imagesSortedTypicalToUnusualGroupedByDigit(batches: List<SplitTestAndTrain>): List<List<INDArray>> {
